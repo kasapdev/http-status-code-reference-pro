@@ -1,6 +1,6 @@
 # HTTP Status Code Reference Pro
 
-[![CI](https://github.com/kasapdev/http-status-code-reference-pro/actions/workflows/ci.yml/badge.svg)](https://github.com/kasapdev/http-status-code-reference-pro/actions/workflows/ci.yml)
+[![CI](https://github.com/kasapdev/http-status-code-reference-pro/actions/workflows/ci.yml/badge.svg)](https://github.com/kasapdev/http-status-code-reference-pro/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) ![Vanilla JS](https://img.shields.io/badge/Vanilla-JS-F7DF1E?logo=javascript&logoColor=black)
 
 A searchable, backend-dev-focused reference for every HTTP status code — with a built-in helper that maps common API scenarios to the status code that actually fits.
 
