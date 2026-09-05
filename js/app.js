@@ -1,7 +1,7 @@
 /* =====================================================================
    HTTP Status Code Reference Pro — app.js
-   Searchable, filterable reference of every IANA HTTP status code, plus
-   a "which code should I use?" scenario helper.
+   Searchable, filterable reference of every IANA-registered HTTP status
+   code, plus a "which code should I use?" scenario helper.
    Classic script (no modules). Depends on window.WUS (core.js).
    ===================================================================== */
 (function () {
@@ -11,173 +11,281 @@
   var STORE_KEY = 'httpstatus.state';
 
   /* =================================================================
-     DATA — real, accurate HTTP status codes (IANA registry / RFC 9110
-     plus common WebDAV / extension codes actually used in the wild).
+     DATA — every IANA-registered HTTP status code (RFC 9110 + WebDAV
+     RFC 4918 + misc. registered extensions), with real names/meanings.
      ================================================================= */
-  var STATUS_CODES = [
-    { code: 100, name: 'Continue', desc: 'The server has received the request headers and the client should proceed to send the request body.' },
-    { code: 101, name: 'Switching Protocols', desc: 'The requester has asked the server to switch protocols (e.g. to WebSocket) and the server has agreed to do so.' },
-    { code: 102, name: 'Processing', desc: '(WebDAV) The server has received and is processing the request, but no response is available yet.' },
-    { code: 103, name: 'Early Hints', desc: 'Used to return some response headers (e.g. Link preload hints) before the final HTTP message is ready.' },
+  var DATA = [
+    // ---- 1xx Informational ----
+    { code: 100, name: 'Continue', cat: '1xx',
+      desc: 'The server has received the request headers and the client should proceed to send the request body. Sent in response to an "Expect: 100-continue" header so the client does not send a large body needlessly.' },
+    { code: 101, name: 'Switching Protocols', cat: '1xx',
+      desc: 'The server is complying with a client request, via the Upgrade header, to switch protocols — most commonly used to upgrade an HTTP connection to a WebSocket connection.' },
+    { code: 102, name: 'Processing', cat: '1xx',
+      desc: 'WebDAV: the server has received and is processing the request, but no response is available yet. Sent to prevent the client from timing out on long-running operations.' },
+    { code: 103, name: 'Early Hints', cat: '1xx',
+      desc: 'Lets the server send preliminary response headers (such as resource preload hints) before the final HTTP response is ready, so the client can start acting on them early.' },
 
-    { code: 200, name: 'OK', desc: 'The request has succeeded. The meaning depends on the HTTP method used.' },
-    { code: 201, name: 'Created', desc: 'The request has succeeded and a new resource has been created as a result — typically the response to a POST.' },
-    { code: 202, name: 'Accepted', desc: 'The request has been received and queued but not yet acted upon; processing may finish asynchronously.' },
-    { code: 203, name: 'Non-Authoritative Information', desc: 'The returned metadata is not exactly the same as is available from the origin server, but is from a local or third-party copy.' },
-    { code: 204, name: 'No Content', desc: 'The server successfully processed the request and is not returning any content — the headers may still be useful.' },
-    { code: 205, name: 'Reset Content', desc: 'Tells the user agent to reset the document which sent this request, e.g. to clear a form.' },
-    { code: 206, name: 'Partial Content', desc: 'Used when the Range header is sent by the client to request only part of a resource.' },
-    { code: 207, name: 'Multi-Status', desc: '(WebDAV) Conveys information about multiple resources in situations where multiple status codes might be appropriate.' },
-    { code: 208, name: 'Already Reported', desc: '(WebDAV) Used inside a DAV binding to avoid enumerating the internal members of multiple bindings to the same collection repeatedly.' },
-    { code: 226, name: 'IM Used', desc: 'The server has fulfilled a GET request and the response is a representation of the result of one or more instance-manipulations applied.' },
+    // ---- 2xx Success ----
+    { code: 200, name: 'OK', cat: '2xx',
+      desc: 'The request succeeded. The meaning of the response body depends on the method — a representation of the resource for GET, or the result of the action for POST.' },
+    { code: 201, name: 'Created', cat: '2xx',
+      desc: 'The request succeeded and a new resource was created as a result, typically after a POST or PUT. The Location header should point to the newly created resource.' },
+    { code: 202, name: 'Accepted', cat: '2xx',
+      desc: 'The request has been accepted for processing, but the processing has not completed and may not even have started yet — used for asynchronous or queued work.' },
+    { code: 203, name: 'Non-Authoritative Information', cat: '2xx',
+      desc: 'The returned metadata is not exactly the same as what the origin server would return; it was collected from a local or third-party copy, typically by a transforming proxy.' },
+    { code: 204, name: 'No Content', cat: '2xx',
+      desc: 'The server successfully processed the request but is intentionally returning no content in the body — common after a DELETE or a PUT with nothing to send back.' },
+    { code: 205, name: 'Reset Content', cat: '2xx',
+      desc: 'The server successfully processed the request and asks the client to reset the document view that sent it, such as clearing a submitted form.' },
+    { code: 206, name: 'Partial Content', cat: '2xx',
+      desc: 'The server is delivering only part of the resource because the client sent a Range header — the basis for resumable downloads and byte-range video/audio streaming.' },
+    { code: 207, name: 'Multi-Status', cat: '2xx',
+      desc: 'WebDAV: conveys status information for multiple independent operations in a single response body (typically XML), since a single HTTP status could not describe them all.' },
+    { code: 208, name: 'Already Reported', cat: '2xx',
+      desc: 'WebDAV: used inside a DAV multi-status response to avoid repeatedly enumerating the internal members of multiple bindings to the same collection.' },
+    { code: 226, name: 'IM Used', cat: '2xx',
+      desc: 'The server fulfilled a GET request and the response is a representation of the result of one or more instance-manipulations applied to the current instance (delta encoding).' },
 
-    { code: 300, name: 'Multiple Choices', desc: 'The request has more than one possible response; the user agent or user should choose one of them.' },
-    { code: 301, name: 'Moved Permanently', desc: 'The URL of the requested resource has changed permanently — clients and search engines should update their links.' },
-    { code: 302, name: 'Found', desc: 'The URI of the requested resource has changed temporarily. Further changes may still occur, so the same URI should be used for future requests.' },
-    { code: 303, name: 'See Other', desc: 'The server sends this to direct the client to fetch the requested resource at another URI with a GET request.' },
-    { code: 304, name: 'Not Modified', desc: 'Used for caching: tells the client the response has not been modified, so the cached version can be reused.' },
-    { code: 305, name: 'Use Proxy', desc: 'Deprecated. Indicated that the requested response had to be accessed via a proxy — removed for security reasons.' },
-    { code: 307, name: 'Temporary Redirect', desc: 'The server sends this to direct the client to get the requested resource at another URI with the same method used in the original request.' },
-    { code: 308, name: 'Permanent Redirect', desc: 'The resource has been moved permanently to a new URI, and the request method must not be changed when reissuing the original request.' },
+    // ---- 3xx Redirection ----
+    { code: 300, name: 'Multiple Choices', cat: '3xx',
+      desc: 'The request has more than one possible response and there is no agreed-upon way to pick one automatically; the user or user agent should choose from the options given.' },
+    { code: 301, name: 'Moved Permanently', cat: '3xx',
+      desc: 'The requested resource has permanently moved to a new URL given in the Location header. Clients, caches, and search engines should update their links to the new URL.' },
+    { code: 302, name: 'Found', cat: '3xx',
+      desc: 'The requested resource resides temporarily under a different URL. Unlike 301, the client should keep using the original URL for future requests.' },
+    { code: 303, name: 'See Other', cat: '3xx',
+      desc: 'The response to the request can be found at another URL and should be retrieved with a GET request — commonly used to redirect after a successful POST (Post/Redirect/Get).' },
+    { code: 304, name: 'Not Modified', cat: '3xx',
+      desc: 'Indicates a cached version of the resource is still valid, so the body is not retransmitted. Returned in response to a conditional request using ETag or If-Modified-Since.' },
+    { code: 305, name: 'Use Proxy', cat: '3xx',
+      desc: 'Deprecated: would have required the requested resource to be accessed through the proxy given in the Location header. Dropped by browsers due to security concerns.' },
+    { code: 307, name: 'Temporary Redirect', cat: '3xx',
+      desc: 'Like 302, but explicitly guarantees the request method and body will not change when the redirected request is repeated — 302 was historically re-sent as GET by some clients.' },
+    { code: 308, name: 'Permanent Redirect', cat: '3xx',
+      desc: 'Like 301, but explicitly guarantees the request method and body will not change when the redirected request is repeated.' },
 
-    { code: 400, name: 'Bad Request', desc: 'The server cannot process the request due to a client error — malformed request syntax, invalid framing, or deceptive request routing.' },
-    { code: 401, name: 'Unauthorized', desc: 'The client must authenticate itself to get the requested response. Despite the name, this means "unauthenticated", not "forbidden".' },
-    { code: 402, name: 'Payment Required', desc: 'Reserved for future use — originally intended for digital payment systems, occasionally repurposed by APIs to signal billing/quota issues.' },
-    { code: 403, name: 'Forbidden', desc: 'The client does not have access rights to the content — identity is known, but the server refuses to authorize the action.' },
-    { code: 404, name: 'Not Found', desc: 'The server cannot find the requested resource. The endpoint may exist but the specific resource does not.' },
-    { code: 405, name: 'Method Not Allowed', desc: 'The request method is known by the server but is not supported by the target resource (e.g. DELETE on a read-only endpoint).' },
-    { code: 406, name: 'Not Acceptable', desc: 'The server cannot produce a response matching the list of acceptable values defined in the request\'s proactive content negotiation headers.' },
-    { code: 407, name: 'Proxy Authentication Required', desc: 'Similar to 401, but authentication is needed to be done by a proxy.' },
-    { code: 408, name: 'Request Timeout', desc: 'The server timed out waiting for the request — the client did not produce a request within the time the server was prepared to wait.' },
-    { code: 409, name: 'Conflict', desc: 'The request conflicts with the current state of the server, e.g. an edit conflict between concurrent updates.' },
-    { code: 410, name: 'Gone', desc: 'The content has been permanently deleted from the server and no forwarding address is known; unlike 404 this is intentional and permanent.' },
-    { code: 411, name: 'Length Required', desc: 'The server rejected the request because the Content-Length header field is not defined and is required.' },
-    { code: 412, name: 'Precondition Failed', desc: 'The client has indicated preconditions in its headers (e.g. If-Match) which the server does not meet.' },
-    { code: 413, name: 'Payload Too Large', desc: 'The request entity is larger than limits defined by the server.' },
-    { code: 414, name: 'URI Too Long', desc: 'The URI requested by the client is longer than the server is willing to interpret.' },
-    { code: 415, name: 'Unsupported Media Type', desc: 'The media format of the requested data is not supported by the server, as indicated in the Content-Type header.' },
-    { code: 416, name: 'Range Not Satisfiable', desc: 'The range specified by the Range header field in the request cannot be fulfilled — it may be outside the size of the target resource.' },
-    { code: 417, name: 'Expectation Failed', desc: 'The expectation indicated by the Expect request header field cannot be met by the server.' },
-    { code: 418, name: "I'm a teapot", desc: 'Defined in RFC 2324 as an April Fools\' joke; the server refuses to brew coffee because it is a teapot.' },
-    { code: 421, name: 'Misdirected Request', desc: 'The request was directed at a server that is not able to produce a response — often due to connection reuse mismatches.' },
-    { code: 422, name: 'Unprocessable Entity', desc: 'The request was well-formed but was unable to be followed due to semantic errors — the standard code for failed validation.' },
-    { code: 423, name: 'Locked', desc: '(WebDAV) The resource that is being accessed is locked.' },
-    { code: 424, name: 'Failed Dependency', desc: '(WebDAV) The request failed due to the failure of a previous request that it depended on.' },
-    { code: 425, name: 'Too Early', desc: 'Indicates that the server is unwilling to risk processing a request that might be replayed (used with TLS early data / 0-RTT).' },
-    { code: 426, name: 'Upgrade Required', desc: 'The server refuses to perform the request using the current protocol but might be willing to do so after the client upgrades.' },
-    { code: 428, name: 'Precondition Required', desc: 'The origin server requires the request to be conditional, to prevent the "lost update" problem.' },
-    { code: 429, name: 'Too Many Requests', desc: 'The user has sent too many requests in a given amount of time — the standard code for rate limiting.' },
-    { code: 431, name: 'Request Header Fields Too Large', desc: 'The server is unwilling to process the request because its header fields are too large.' },
-    { code: 451, name: 'Unavailable For Legal Reasons', desc: 'The user requested a resource that is unavailable for legal reasons, e.g. a censored or DMCA-blocked resource.' },
+    // ---- 4xx Client Error ----
+    { code: 400, name: 'Bad Request', cat: '4xx',
+      desc: 'The server cannot or will not process the request due to a client error — malformed request syntax, invalid framing, or otherwise unparseable input.' },
+    { code: 401, name: 'Unauthorized', cat: '4xx',
+      desc: 'Authentication is required and has either failed or not been supplied. Despite the name, this is about authentication, not authorization — the client should log in and retry.' },
+    { code: 402, name: 'Payment Required', cat: '4xx',
+      desc: 'Reserved for future use since the earliest days of HTTP. Some APIs repurpose it today to signal billing issues, an expired trial, or exhausted usage credits.' },
+    { code: 403, name: 'Forbidden', cat: '4xx',
+      desc: 'The server understood the request but refuses to authorize it. Unlike 401, re-authenticating will not help — the caller\'s identity is known but lacks permission.' },
+    { code: 404, name: 'Not Found', cat: '4xx',
+      desc: 'The server cannot find the requested resource. The endpoint may genuinely not exist, or the server is deliberately hiding its existence from an unauthorized caller.' },
+    { code: 405, name: 'Method Not Allowed', cat: '4xx',
+      desc: 'The request method is known to the server but is not supported by the target resource — for example sending DELETE to a read-only endpoint.' },
+    { code: 406, name: 'Not Acceptable', cat: '4xx',
+      desc: 'The server cannot produce a response matching the Accept, Accept-Language, or Accept-Encoding values the client listed as acceptable in the request.' },
+    { code: 407, name: 'Proxy Authentication Required', cat: '4xx',
+      desc: 'Similar to 401, but the client must first authenticate itself with a proxy that sits between it and the server.' },
+    { code: 408, name: 'Request Timeout', cat: '4xx',
+      desc: 'The server timed out waiting for the request; the client did not produce a complete request within the time the server was prepared to wait.' },
+    { code: 409, name: 'Conflict', cat: '4xx',
+      desc: 'The request conflicts with the current state of the target resource, such as an edit-collision, a version mismatch, or an attempt to create a duplicate resource.' },
+    { code: 410, name: 'Gone', cat: '4xx',
+      desc: 'The requested resource is no longer available and no forwarding address is known. Unlike 404, this condition is expected to be permanent, which caches and crawlers can rely on.' },
+    { code: 411, name: 'Length Required', cat: '4xx',
+      desc: 'The server refuses to accept the request without a defined Content-Length header.' },
+    { code: 412, name: 'Precondition Failed', cat: '4xx',
+      desc: 'A condition given in one of the request\'s header fields (such as If-Match or If-Unmodified-Since) evaluated to false when tested against the current resource state.' },
+    { code: 413, name: 'Content Too Large', cat: '4xx',
+      desc: 'The request body is larger than the server is willing or able to process. The server may close the connection and may include a Retry-After header. Formerly "Payload Too Large".' },
+    { code: 414, name: 'URI Too Long', cat: '4xx',
+      desc: 'The URI requested by the client is longer than the server is willing to interpret, often caused by a GET request that should have been a POST.' },
+    { code: 415, name: 'Unsupported Media Type', cat: '4xx',
+      desc: 'The server refuses to accept the request because the payload\'s Content-Type (or Content-Encoding) is not supported for this endpoint.' },
+    { code: 416, name: 'Range Not Satisfiable', cat: '4xx',
+      desc: 'The range specified by the request\'s Range header cannot be fulfilled, usually because it falls outside the actual size of the target resource.' },
+    { code: 417, name: 'Expectation Failed', cat: '4xx',
+      desc: 'The expectation given in the request\'s Expect header field could not be met by the server.' },
+    { code: 418, name: "I'm a Teapot", cat: '4xx',
+      desc: 'Defined by the April Fools\' RFC 2324 (Hyper Text Coffee Pot Control Protocol); a teapot asked to brew coffee should return this. Not meant to be implemented by real servers.' },
+    { code: 421, name: 'Misdirected Request', cat: '4xx',
+      desc: 'The request was directed at a server that is not able to produce a response, for example due to connection reuse or IP-based virtual hosting mismatches.' },
+    { code: 422, name: 'Unprocessable Content', cat: '4xx',
+      desc: 'The server understands the content type and syntax of the request but was unable to process the contained instructions — the classic status for semantic validation failures.' },
+    { code: 423, name: 'Locked', cat: '4xx',
+      desc: 'WebDAV: the source or destination resource of a method is locked, so the operation could not be performed.' },
+    { code: 424, name: 'Failed Dependency', cat: '4xx',
+      desc: 'WebDAV: the method could not be performed because a previous, related step in the same request chain failed.' },
+    { code: 425, name: 'Too Early', cat: '4xx',
+      desc: 'The server is unwilling to risk processing a request that might be replayed, used to protect early (0-RTT) TLS data from replay attacks.' },
+    { code: 426, name: 'Upgrade Required', cat: '4xx',
+      desc: 'The server refuses to perform the request using the current protocol but might be willing to after the client upgrades to a different protocol, named in the Upgrade header.' },
+    { code: 428, name: 'Precondition Required', cat: '4xx',
+      desc: 'The origin server requires the request to be conditional, intended to prevent the "lost update" problem where two clients edit a resource without seeing each other\'s changes.' },
+    { code: 429, name: 'Too Many Requests', cat: '4xx',
+      desc: 'The client has sent too many requests in a given time window ("rate limiting"). The response commonly includes a Retry-After header telling the client when to try again.' },
+    { code: 431, name: 'Request Header Fields Too Large', cat: '4xx',
+      desc: 'The server is unwilling to process the request because its header fields are too large, either individually or in total.' },
+    { code: 451, name: 'Unavailable For Legal Reasons', cat: '4xx',
+      desc: 'The server is denying access to the resource as a consequence of a legal demand, such as a government-mandated content takedown or court order.' },
 
-    { code: 500, name: 'Internal Server Error', desc: 'The server has encountered a situation it does not know how to handle — the generic catch-all for unexpected server-side failures.' },
-    { code: 501, name: 'Not Implemented', desc: 'The request method is not supported by the server and cannot be handled for any resource.' },
-    { code: 502, name: 'Bad Gateway', desc: 'The server, while acting as a gateway or proxy, received an invalid response from the upstream server.' },
-    { code: 503, name: 'Service Unavailable', desc: 'The server is not ready to handle the request, often due to maintenance or overload. Should typically be temporary.' },
-    { code: 504, name: 'Gateway Timeout', desc: 'The server, while acting as a gateway or proxy, did not get a response in time from the upstream server.' },
-    { code: 505, name: 'HTTP Version Not Supported', desc: 'The HTTP version used in the request is not supported by the server.' },
-    { code: 506, name: 'Variant Also Negotiates', desc: 'The server has an internal configuration error: transparent content negotiation for the request results in a circular reference.' },
-    { code: 507, name: 'Insufficient Storage', desc: '(WebDAV) The server is unable to store the representation needed to complete the request.' },
-    { code: 508, name: 'Loop Detected', desc: '(WebDAV) The server detected an infinite loop while processing a request.' },
-    { code: 510, name: 'Not Extended', desc: 'Further extensions to the request are required for the server to fulfill it.' },
-    { code: 511, name: 'Network Authentication Required', desc: 'The client needs to authenticate to gain network access, e.g. via a captive portal.' }
+    // ---- 5xx Server Error ----
+    { code: 500, name: 'Internal Server Error', cat: '5xx',
+      desc: 'A generic, catch-all error indicating the server encountered an unexpected condition and no more specific status is appropriate — typically an unhandled exception.' },
+    { code: 501, name: 'Not Implemented', cat: '5xx',
+      desc: 'The server does not support the functionality required to fulfill the request, such as an unrecognized or unsupported HTTP method.' },
+    { code: 502, name: 'Bad Gateway', cat: '5xx',
+      desc: 'The server, acting as a gateway or proxy, received an invalid or malformed response from the upstream server it contacted while fulfilling the request.' },
+    { code: 503, name: 'Service Unavailable', cat: '5xx',
+      desc: 'The server is temporarily unable to handle the request, typically due to overload, maintenance, or an unavailable dependency. Expected to be a transient condition.' },
+    { code: 504, name: 'Gateway Timeout', cat: '5xx',
+      desc: 'The server, acting as a gateway or proxy, did not receive a timely response from the upstream server it needed to access to complete the request.' },
+    { code: 505, name: 'HTTP Version Not Supported', cat: '5xx',
+      desc: 'The server does not support, or refuses to support, the major version of the HTTP protocol used in the request message.' },
+    { code: 506, name: 'Variant Also Negotiates', cat: '5xx',
+      desc: 'An internal server configuration error: the resource chosen for content negotiation is itself configured to negotiate, creating a circular reference.' },
+    { code: 507, name: 'Insufficient Storage', cat: '5xx',
+      desc: 'WebDAV: the server is unable to store the representation needed to complete the request due to insufficient storage space.' },
+    { code: 508, name: 'Loop Detected', cat: '5xx',
+      desc: 'WebDAV: the server detected an infinite loop while processing a request with "Depth: infinity", such as a collection that binds to itself.' },
+    { code: 510, name: 'Not Extended', cat: '5xx',
+      desc: 'Further extensions to the request are required for the server to fulfill it, and the client should resubmit after making those extensions.' },
+    { code: 511, name: 'Network Authentication Required', cat: '5xx',
+      desc: 'The client needs to authenticate to gain network access, typically used by captive portals such as hotel or airport Wi-Fi login pages intercepting requests.' }
   ];
 
-  function categoryOf(code) { return Math.floor(code / 100) + 'xx'; }
+  var CAT_LABELS = {
+    '1xx': '1xx Informational',
+    '2xx': '2xx Success',
+    '3xx': '3xx Redirection',
+    '4xx': '4xx Client Error',
+    '5xx': '5xx Server Error'
+  };
 
-  /* Curated "which code should I use?" scenarios. */
+  var WEBDAV_CODES = { 102: 1, 207: 1, 208: 1, 423: 1, 424: 1, 507: 1, 508: 1 };
+
+  /* =================================================================
+     SCENARIOS — "which code should I use?" helper
+     ================================================================= */
   var SCENARIOS = [
-    { q: 'A new resource was successfully created', code: 201, why: 'Signals successful creation; conventionally paired with a Location header pointing at the new resource.' },
-    { q: 'Request validation / business-rule check failed', code: 422, why: 'The request was well-formed but semantically invalid. Use 400 instead only for malformed syntax the parser itself rejects.' },
-    { q: 'User is not authenticated', code: 401, why: 'Despite the name "Unauthorized", this means no (or invalid) credentials were supplied — not "forbidden".' },
-    { q: 'User is authenticated but not allowed to do this', code: 403, why: 'The server knows who is asking and refuses anyway — this is an authorization failure, not an authentication one.' },
-    { q: 'Client is sending too many requests', code: 429, why: 'The standard rate-limiting response; pair it with a Retry-After header telling the client when to try again.' },
-    { q: 'Resource deleted, nothing meaningful to return', code: 204, why: 'Confirms success without a response body — common after DELETE, or a PUT that does not echo the resource back.' },
-    { q: 'Long-running job accepted for async processing', code: 202, why: 'The request was valid and has been queued, but processing has not completed — return a status URL if you have one.' },
-    { q: 'Resource permanently moved to a new URL', code: 301, why: 'Tells clients and search engines to update bookmarks and links for good; safe to cache aggressively.' },
-    { q: 'Redirect but the client must keep the same method/body', code: 307, why: 'Unlike 302/303, this guarantees the method and body are preserved across the redirect.' },
-    { q: 'Unhandled exception / server crashed', code: 500, why: 'The generic catch-all for unexpected server-side failures — avoid leaking stack traces in the body.' }
+    { q: 'A new resource was successfully created', code: 201,
+      why: 'Signals success plus creation specifically — pair it with a Location header pointing at the new resource, unlike a plain 200.' },
+    { q: 'Request body failed validation rules', code: 422,
+      why: 'The syntax parsed fine (so it isn\'t 400), but the semantics — a missing field, bad format, failed business rule — are invalid.' },
+    { q: 'Caller has no valid credentials', code: 401,
+      why: 'This is about authentication, not permission — the caller isn\'t identified yet, so ask them to log in or send a valid token.' },
+    { q: 'Caller is identified but not allowed to do this', code: 403,
+      why: 'Identity is already known and valid; the problem is permission, so re-authenticating changes nothing.' },
+    { q: 'Client is sending requests too fast', code: 429,
+      why: 'The dedicated rate-limiting status — pair it with a Retry-After header so well-behaved clients know when to retry.' },
+    { q: 'The requested resource does not exist', code: 404,
+      why: 'The most literal match, and also the conventional way to hide a resource\'s existence from a caller who shouldn\'t know about it.' },
+    { q: 'Deletion succeeded, nothing to send back', code: 204,
+      why: 'The operation fully succeeded but there is no representation to return, so the body is intentionally empty rather than omitted by accident.' },
+    { q: 'A long-running job was queued, not finished', code: 202,
+      why: 'Tells the caller their request was accepted for asynchronous work — return a status URL so they can poll for the real outcome later.' },
+    { q: 'This URL has moved for good — update your links', code: 301,
+      why: 'Explicitly tells clients, caches, and search engines the change is permanent, so they should stop using the old URL going forward.' },
+    { q: 'Creating this would duplicate an existing record', code: 409,
+      why: 'The request is well-formed but conflicts with the resource\'s current state — a duplicate unique key is the textbook case.' },
+    { q: 'Our code threw an unhandled exception', code: 500,
+      why: 'The generic catch-all for an unexpected server-side failure when nothing more specific applies — a bug, not a client mistake.' },
+    { q: 'A dependency or upstream service is down', code: 503,
+      why: 'Signals the outage is likely temporary and not the caller\'s fault; add a Retry-After header if you know roughly how long it will last.' }
   ];
 
-  /* =================================================================
-     DOM refs
-     ================================================================= */
-  var searchInput   = document.getElementById('searchInput');
-  var btnClearSearch= document.getElementById('btnClearSearch');
-  var categoryTabs  = document.getElementById('categoryTabs');
-  var scenarioGrid  = document.getElementById('scenarioGrid');
-  var codeList      = document.getElementById('codeList');
-  var resultCount   = document.getElementById('resultCount');
-  var emptyState    = document.getElementById('emptyState');
+  /* ----------------------------- DOM refs ---------------------------- */
+  var searchInput     = document.getElementById('searchInput');
+  var btnClearSearch  = document.getElementById('btnClearSearch');
+  var categoryTabs    = document.getElementById('categoryTabs');
+  var codeList        = document.getElementById('codeList');
+  var emptyState      = document.getElementById('emptyState');
+  var resultCount     = document.getElementById('resultCount');
+  var statusText      = document.getElementById('statusText');
+  var scenarioGrid    = document.getElementById('scenarioGrid');
   var btnResetFilters = document.getElementById('btnResetFilters');
-  var statusText    = document.getElementById('statusText');
 
-  var state = { search: '', cat: 'all', open: {} };
+  var state = { search: '', cat: 'all', open: null };
 
   /* =================================================================
-     Helpers
+     Lookup / filter helpers
      ================================================================= */
+  function findByCode(code) {
+    for (var i = 0; i < DATA.length; i++) {
+      if (DATA[i].code === code) return DATA[i];
+    }
+    return null;
+  }
+
+  function catClass(cat) { return 'cat-' + cat; }
+
   function escapeRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
-  function highlight(text, query) {
+  function matches(item, query) {
+    if (!query) return true;
+    var q = query.toLowerCase().trim();
+    if (!q) return true;
+    return String(item.code).indexOf(q) !== -1 ||
+           item.name.toLowerCase().indexOf(q) !== -1 ||
+           item.desc.toLowerCase().indexOf(q) !== -1;
+  }
+
+  function filteredData() {
+    return DATA.filter(function (item) {
+      if (state.cat !== 'all' && item.cat !== state.cat) return false;
+      return matches(item, state.search);
+    });
+  }
+
+  function highlightText(text, query) {
     var escaped = WUS.escapeHtml(text);
-    if (!query) return escaped;
+    var q = (query || '').trim();
+    if (!q) return escaped;
     try {
-      var re = new RegExp('(' + escapeRegExp(query) + ')', 'ig');
+      var re = new RegExp('(' + escapeRegExp(q) + ')', 'ig');
       return escaped.replace(re, '<mark>$1</mark>');
     } catch (e) { return escaped; }
   }
 
-  function matches(item, query, cat) {
-    if (cat !== 'all' && categoryOf(item.code) !== cat) return false;
-    if (!query) return true;
-    var q = query.toLowerCase();
-    return String(item.code).indexOf(q) > -1 ||
-           item.name.toLowerCase().indexOf(q) > -1 ||
-           item.desc.toLowerCase().indexOf(q) > -1;
-  }
-
   /* =================================================================
-     Rendering
+     RENDER — status code list
      ================================================================= */
   function renderList() {
-    var q = state.search.trim();
-    var filtered = STATUS_CODES.filter(function (item) { return matches(item, q, state.cat); });
-
+    var items = filteredData();
     codeList.innerHTML = '';
-    if (!filtered.length) {
+
+    if (items.length === 0) {
       emptyState.hidden = false;
     } else {
       emptyState.hidden = true;
-      filtered.forEach(function (item) {
-        codeList.appendChild(buildRow(item, q));
-      });
+      items.forEach(function (item) { codeList.appendChild(buildRow(item)); });
     }
 
-    resultCount.textContent = filtered.length + ' of ' + STATUS_CODES.length;
+    resultCount.textContent = items.length + ' of ' + DATA.length;
   }
 
-  function buildRow(item, q) {
-    var cat = categoryOf(item.code);
-    var isOpen = !!state.open[item.code];
-
+  function buildRow(item) {
     var row = document.createElement('div');
-    row.className = 'code-row' + (isOpen ? ' is-open' : '');
+    row.className = 'code-row';
     row.dataset.code = item.code;
+    var isOpen = state.open === item.code;
+    if (isOpen) row.classList.add('is-open');
 
-    var head = document.createElement('button');
-    head.type = 'button';
+    var head = document.createElement('div');
     head.className = 'code-row-head';
+    head.setAttribute('role', 'button');
+    head.setAttribute('tabindex', '0');
     head.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
 
-    var numSpan = document.createElement('span');
-    numSpan.className = 'code-num cat-' + cat;
-    numSpan.textContent = item.code;
+    var num = document.createElement('span');
+    num.className = 'code-num ' + catClass(item.cat);
+    num.textContent = item.code;
 
-    var nameSpan = document.createElement('span');
-    nameSpan.className = 'code-name';
-    nameSpan.innerHTML = highlight(item.code + ' ' + item.name, q) +
-      '<span class="code-desc-preview">' + highlight(item.desc, q) + '</span>';
+    var name = document.createElement('span');
+    name.className = 'code-name';
+    var nameMain = document.createElement('span');
+    nameMain.innerHTML = highlightText(item.name, state.search);
+    var preview = document.createElement('span');
+    preview.className = 'code-desc-preview';
+    preview.innerHTML = highlightText(item.desc, state.search);
+    name.appendChild(nameMain);
+    name.appendChild(preview);
 
     var actions = document.createElement('span');
     actions.className = 'code-row-actions';
@@ -190,33 +298,26 @@
     copyBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
     copyBtn.addEventListener('click', function (e) {
       e.stopPropagation();
-      WUS.copy(item.code + ' ' + item.name, 'Copied "' + item.code + ' ' + item.name + '"');
+      copyCode(item);
     });
 
-    var chevron = document.createElement('svg');
-    chevron.setAttribute('class', 'code-chevron');
-    chevron.setAttribute('viewBox', '0 0 24 24');
-    chevron.setAttribute('fill', 'none');
-    chevron.setAttribute('stroke', 'currentColor');
-    chevron.setAttribute('stroke-width', '2');
-    chevron.setAttribute('stroke-linecap', 'round');
-    chevron.setAttribute('stroke-linejoin', 'round');
-    chevron.setAttribute('aria-hidden', 'true');
-    chevron.innerHTML = '<path d="m6 9 6 6 6-6"/>';
+    var chevron = document.createElement('span');
+    chevron.className = 'code-chevron';
+    chevron.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
 
     actions.appendChild(copyBtn);
     actions.appendChild(chevron);
 
-    head.appendChild(numSpan);
-    head.appendChild(nameSpan);
+    head.appendChild(num);
+    head.appendChild(name);
     head.appendChild(actions);
 
-    head.addEventListener('click', function () {
-      state.open[item.code] = !state.open[item.code];
-      persist();
-      renderList();
-      var again = document.querySelector('.code-row[data-code="' + item.code + '"] .code-row-head');
-      if (again) again.focus();
+    head.addEventListener('click', function () { toggleRow(item.code); });
+    head.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleRow(item.code);
+      }
     });
 
     row.appendChild(head);
@@ -225,10 +326,13 @@
       var body = document.createElement('div');
       body.className = 'code-row-body';
       var p = document.createElement('p');
-      p.innerHTML = highlight(item.desc, q);
+      p.textContent = item.desc;
       var meta = document.createElement('div');
       meta.className = 'code-meta';
-      meta.innerHTML = '<span>Category: ' + cat.toUpperCase() + '</span><span>Code: ' + item.code + '</span>';
+      var specLabel = WEBDAV_CODES[item.code] ? 'RFC 9110 · WebDAV (RFC 4918)' : 'RFC 9110';
+      meta.innerHTML =
+        '<span>' + WUS.escapeHtml(CAT_LABELS[item.cat]) + '</span>' +
+        '<span class="mono">' + WUS.escapeHtml(specLabel) + '</span>';
       body.appendChild(p);
       body.appendChild(meta);
       row.appendChild(body);
@@ -237,11 +341,25 @@
     return row;
   }
 
+  function toggleRow(code) {
+    state.open = (state.open === code) ? null : code;
+    renderList();
+    var el = codeList.querySelector('.code-row[data-code="' + code + '"]');
+    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  function copyCode(item) {
+    WUS.copy(item.code + ' ' + item.name, 'Copied "' + item.code + ' ' + item.name + '"');
+  }
+
+  /* =================================================================
+     RENDER — scenario helper cards
+     ================================================================= */
   function renderScenarios() {
     scenarioGrid.innerHTML = '';
     SCENARIOS.forEach(function (s) {
-      var item = STATUS_CODES.filter(function (c) { return c.code === s.code; })[0];
-      var cat = categoryOf(s.code);
+      var item = findByCode(s.code);
+      if (!item) return;
 
       var card = document.createElement('div');
       card.className = 'scenario-card';
@@ -252,15 +370,13 @@
 
       var codeRow = document.createElement('div');
       codeRow.className = 'scenario-code-row';
-
-      var codeBtn = document.createElement('button');
-      codeBtn.type = 'button';
-      codeBtn.className = 'scenario-code cat-' + cat;
-      codeBtn.textContent = s.code + ' ' + (item ? item.name : '');
-      codeBtn.title = 'Jump to this status code';
-      codeBtn.addEventListener('click', function () { jumpToCode(s.code); });
-
-      codeRow.appendChild(codeBtn);
+      var chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'scenario-code ' + catClass(item.cat);
+      chip.textContent = item.code + ' ' + item.name;
+      chip.title = 'Jump to ' + item.code + ' in the list below';
+      chip.addEventListener('click', function () { jumpToCode(item.code); });
+      codeRow.appendChild(chip);
 
       var why = document.createElement('p');
       why.className = 'scenario-why';
@@ -274,60 +390,117 @@
   }
 
   function jumpToCode(code) {
-    searchInput.value = String(code);
-    state.search = String(code);
+    state.search = '';
     state.cat = 'all';
+    searchInput.value = '';
+    btnClearSearch.hidden = true;
     setActiveTab('all');
-    state.open[code] = true;
-    toggleClearBtn();
-    persist();
+    state.open = code;
     renderList();
-    var row = document.querySelector('.code-row[data-code="' + code + '"]');
-    if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    persist();
+    var el = codeList.querySelector('.code-row[data-code="' + code + '"]');
+    if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 
+  /* =================================================================
+     CATEGORY TABS
+     ================================================================= */
   function setActiveTab(cat) {
-    var btns = categoryTabs.querySelectorAll('button[data-cat]');
+    var btns = categoryTabs.querySelectorAll('button');
     for (var i = 0; i < btns.length; i++) {
       var isActive = btns[i].getAttribute('data-cat') === cat;
       btns[i].setAttribute('aria-selected', isActive ? 'true' : 'false');
     }
   }
 
-  function toggleClearBtn() {
-    btnClearSearch.hidden = !state.search;
+  function setCategory(cat) {
+    state.cat = cat;
+    setActiveTab(cat);
+    renderList();
+    persist();
   }
 
+  categoryTabs.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('button[data-cat]') : null;
+    if (!btn) return;
+    setCategory(btn.getAttribute('data-cat'));
+  });
+
   /* =================================================================
-     Persistence
+     SEARCH WIRING
+     ================================================================= */
+  function onSearchInput() {
+    state.search = searchInput.value;
+    btnClearSearch.hidden = !state.search;
+    renderList();
+    persistDebounced();
+  }
+
+  searchInput.addEventListener('input', onSearchInput);
+  searchInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      if (searchInput.value) {
+        e.preventDefault();
+        searchInput.value = '';
+        onSearchInput();
+      } else {
+        searchInput.blur();
+      }
+    }
+  });
+
+  btnClearSearch.addEventListener('click', function () {
+    searchInput.value = '';
+    onSearchInput();
+    searchInput.focus();
+  });
+
+  btnResetFilters.addEventListener('click', function () {
+    searchInput.value = '';
+    state.search = '';
+    btnClearSearch.hidden = true;
+    setCategory('all');
+  });
+
+  /* =================================================================
+     PERSISTENCE
      ================================================================= */
   function persist() {
-    WUS.store.set(STORE_KEY, { search: state.search, cat: state.cat, open: state.open });
+    WUS.store.set(STORE_KEY, { search: state.search, cat: state.cat });
   }
-  var persistDebounced = WUS.debounce(persist, 300);
+  var persistDebounced = WUS.debounce(persist, 350);
 
   function restore() {
     var saved = WUS.store.get(STORE_KEY, null);
     if (!saved) return;
-    state.search = typeof saved.search === 'string' ? saved.search : '';
-    state.cat = saved.cat || 'all';
-    state.open = saved.open && typeof saved.open === 'object' ? saved.open : {};
-    searchInput.value = state.search;
-    setActiveTab(state.cat);
-    toggleClearBtn();
+    if (typeof saved.search === 'string') {
+      state.search = saved.search;
+      searchInput.value = saved.search;
+      btnClearSearch.hidden = !saved.search;
+    }
+    if (saved.cat && (saved.cat === 'all' || CAT_LABELS[saved.cat])) {
+      state.cat = saved.cat;
+      setActiveTab(saved.cat);
+    }
   }
 
   /* =================================================================
-     Shortcuts help modal
+     SHORTCUTS HELP MODAL
      ================================================================= */
   var helpBackdrop = document.getElementById('helpBackdrop');
   var helpClose    = document.getElementById('helpClose');
   var shortcutRows = document.getElementById('shortcutRows');
 
   var SHORTCUTS = [
-    { keys: ['/'], desc: 'Focus search' },
-    { keys: ['Esc'], desc: 'Clear search / close dialog' },
-    { keys: ['?'], desc: 'Show this help' }
+    { keys: ['/'], desc: 'Focus the search box' },
+    { keys: ['1'], desc: 'Show 1xx Informational' },
+    { keys: ['2'], desc: 'Show 2xx Success' },
+    { keys: ['3'], desc: 'Show 3xx Redirection' },
+    { keys: ['4'], desc: 'Show 4xx Client Error' },
+    { keys: ['5'], desc: 'Show 5xx Server Error' },
+    { keys: ['0'], desc: 'Show all categories' },
+    { keys: ['?'], desc: 'Show this help' },
+    { keys: ['Esc'], desc: 'Clear search / close dialog' }
   ];
 
   function buildShortcutTable() {
@@ -346,81 +519,34 @@
   helpBackdrop.addEventListener('click', function (e) {
     if (e.target === helpBackdrop) closeHelp();
   });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !helpBackdrop.hidden) closeHelp();
+  });
 
   var helpBtns = document.querySelectorAll('[data-shortcut-help]');
   for (var i = 0; i < helpBtns.length; i++) helpBtns[i].addEventListener('click', openHelp);
 
-  /* =================================================================
-     Wiring
-     ================================================================= */
-  searchInput.addEventListener('input', function () {
-    state.search = searchInput.value;
-    toggleClearBtn();
-    persistDebounced();
-    renderList();
-  });
-
-  searchInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') {
-      if (state.search) {
-        e.preventDefault();
-        searchInput.value = '';
-        state.search = '';
-        toggleClearBtn();
-        persist();
-        renderList();
-      } else {
-        searchInput.blur();
-      }
-    }
-  });
-
-  btnClearSearch.addEventListener('click', function () {
-    searchInput.value = '';
-    state.search = '';
-    toggleClearBtn();
-    persist();
-    renderList();
-    searchInput.focus();
-  });
-
-  categoryTabs.addEventListener('click', function (e) {
-    var btn = e.target.closest ? e.target.closest('button[data-cat]') : null;
-    if (!btn) return;
-    state.cat = btn.getAttribute('data-cat');
-    setActiveTab(state.cat);
-    persist();
-    renderList();
-  });
-
-  btnResetFilters.addEventListener('click', function () {
-    state.search = '';
-    state.cat = 'all';
-    searchInput.value = '';
-    setActiveTab('all');
-    toggleClearBtn();
-    persist();
-    renderList();
-  });
-
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !helpBackdrop.hidden) { closeHelp(); return; }
-    var tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
-    var typing = tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable);
-    if (!typing && e.key === '/') {
-      e.preventDefault();
-      searchInput.focus();
-    }
-  });
-
+  /* Global keyboard shortcuts via WUS (bare keys are ignored while typing
+     in a text field, per core.js, except the search input's own handler). */
+  WUS.registerShortcut('/', function () { searchInput.focus(); searchInput.select(); }, 'Focus search');
+  WUS.registerShortcut('1', function () { setCategory('1xx'); }, 'Show 1xx Informational');
+  WUS.registerShortcut('2', function () { setCategory('2xx'); }, 'Show 2xx Success');
+  WUS.registerShortcut('3', function () { setCategory('3xx'); }, 'Show 3xx Redirection');
+  WUS.registerShortcut('4', function () { setCategory('4xx'); }, 'Show 4xx Client Error');
+  WUS.registerShortcut('5', function () { setCategory('5xx'); }, 'Show 5xx Server Error');
+  WUS.registerShortcut('0', function () { setCategory('all'); }, 'Show all categories');
   WUS.registerShortcut('?', function () { openHelp(); }, 'Show shortcuts');
 
   /* =================================================================
-     Init
+     INIT
      ================================================================= */
-  buildShortcutTable();
-  statusText.textContent = STATUS_CODES.length + ' codes';
-  restore();
-  renderScenarios();
-  renderList();
+  function init() {
+    statusText.textContent = DATA.length + ' codes';
+    buildShortcutTable();
+    renderScenarios();
+    restore();
+    renderList();
+  }
+
+  init();
 })();

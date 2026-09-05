@@ -1,22 +1,22 @@
 # HTTP Status Code Reference Pro
 
-A searchable, filterable reference of every HTTP status code, plus a "which code should I use?" helper for real API-design decisions.
+A searchable, backend-dev-focused reference for every HTTP status code — with a built-in helper that maps common API scenarios to the status code that actually fits.
 
-> Stop guessing between 401 and 403, or 200 and 204. Search by code or keyword, filter by category, and expand any entry for the full picture — all instant, all offline, nothing sent anywhere.
+> Stop guessing between 401 and 403, or 409 and 422. Look up any of the 62 IANA-registered HTTP status codes by number or keyword, or describe the situation your API is in and get the right code with a one-line justification for why it's correct — all offline, in your browser.
 
 ## Overview
 
-HTTP Status Code Reference Pro is part of the **Web Utility Suite**. It runs entirely in the browser with no build step, no frameworks, and no network calls — open `index.html` from disk and it works. Every standard status code from 100 to 511 is included with an accurate description sourced from the HTTP specification and the IANA status code registry, grouped into Informational (1xx), Success (2xx), Redirection (3xx), Client Error (4xx), and Server Error (5xx). A dedicated scenario panel maps common backend/API situations — "not authenticated", "rate limited", "validation failed" — to the correct code with a one-line justification, so you can settle the argument in your next PR review.
+HTTP Status Code Reference Pro is part of the **Web Utility Suite**. It runs entirely in the browser with no build step, no frameworks, and no network calls — open `index.html` from disk and it works. The tool ships a complete, accurate dataset of every status code registered in the IANA HTTP Status Code Registry (1xx through 5xx, including the WebDAV extension codes), grouped by category and instantly searchable. A dedicated "Which code should I use?" panel covers the everyday API-design decisions backend developers actually face — creation, validation, auth, rate limiting, redirects, and failure modes — each with a short explanation of *why* that code is the right one, not just a lookup table.
 
 ## Features
 
-- **Full status code catalog** — every code from 100–511 that's part of the HTTP spec or common WebDAV/extension set, with accurate descriptions (no fabricated codes).
-- **Live search** — matches against the code number, name, or description text as you type, with matches highlighted inline.
-- **Category filter** — segmented tabs for All / 1xx / 2xx / 3xx / 4xx / 5xx.
-- **Expandable rows** — click any code to reveal its full description and category metadata.
-- **"Which code should I use?"** — 10 curated real-world scenarios (resource created, validation failed, not authenticated, forbidden, rate limited, and more) each mapped to the correct status code with a short justification. Click a scenario's code to jump straight to its full entry.
-- **Copy** — copy any code + name (e.g. `404 Not Found`) to the clipboard with one click.
-- **Auto-persist** — your last search, category filter, and expanded rows are saved to `localStorage` and restored on return.
+- **Complete, accurate dataset** — all 62 IANA-registered status codes (100–511), each with its correct RFC name and a precise one-to-two-sentence description.
+- **Category tabs** — filter to 1xx Informational, 2xx Success, 3xx Redirection, 4xx Client Error, or 5xx Server Error, or view everything at once.
+- **Live free-text search** — matches against the code number, its name, or its description simultaneously, with matching text highlighted inline.
+- **Which code should I use?** — 12 real-world API scenarios (resource created, validation failed, not authenticated, forbidden, rate limited, not found, no-content deletion, async job accepted, permanent redirect, conflicting state, unhandled crash, upstream outage) each mapped to the correct status code with a justification for *why*.
+- **Expandable rows** — click any status code to reveal its full description, spec reference, and category.
+- **One-click copy** — copy any code as `"404 Not Found"`-style text, ready to paste into code, docs, or a commit message.
+- **Persistent state** — your last search term and category filter are remembered between visits via `localStorage`.
 - **Dark & light themes**, fully responsive down to 360px, accessible, and keyboard-driven.
 
 ## Installation
@@ -32,32 +32,40 @@ Then simply open `index.html` in any modern browser (double-click it, or `file:/
 
 ## Usage
 
-1. Type in the search box to filter by **code number or keyword** — e.g. `404`, `unauthorized`, `timeout`.
-2. Use the **category tabs** to narrow the list to a status-code class.
-3. Click a **row** to expand its full description and metadata.
-4. Check the **"Which code should I use?"** panel for common scenario → status-code mappings, and click a code chip to jump to it.
-5. Click the **copy icon** on any row to copy `<code> <name>` to your clipboard.
+1. Browse the **Which code should I use?** panel for common scenarios, or scroll down to the full **Status codes** list.
+2. Use the **search box** to find a code by number (`404`) or by keyword (`timeout`, `unauthorized`, `rate limit`).
+3. Use the **category tabs** to narrow the list to a single class of status code (1xx–5xx).
+4. Click any row to **expand** it and read the full description and spec reference.
+5. Click the **copy icon** on a row to copy `"CODE Name"` to your clipboard, or click a scenario's code chip to jump straight to it in the list below.
 
 ## Keyboard Shortcuts
 
-| Action               | Shortcut |
-| -------------------- | -------- |
-| Focus search          | <kbd>/</kbd>   |
-| Clear search / close dialog | <kbd>Esc</kbd> |
-| Show shortcuts help  | <kbd>?</kbd>   |
+| Action                       | Shortcut |
+| ----------------------------- | -------- |
+| Focus the search box          | <kbd>/</kbd> |
+| Show 1xx Informational        | <kbd>1</kbd> |
+| Show 2xx Success              | <kbd>2</kbd> |
+| Show 3xx Redirection          | <kbd>3</kbd> |
+| Show 4xx Client Error         | <kbd>4</kbd> |
+| Show 5xx Server Error         | <kbd>5</kbd> |
+| Show all categories           | <kbd>0</kbd> |
+| Show this help                | <kbd>?</kbd> |
+| Clear search / close dialog   | <kbd>Esc</kbd> |
 
 ## Screenshots
 
 > _Screenshots coming soon._
 
 ![screenshot](docs/screenshot-1.png)
+![screenshot](docs/screenshot-2.png)
 
 ## Roadmap
 
-- [ ] Copy the full JSON catalog of codes for use in tests/fixtures
-- [ ] Per-code "common causes" and "how to fix" checklist for 4xx/5xx
-- [ ] Deep-linkable URLs per status code (`#404`)
-- [ ] REST framework cheat-sheet cross-reference (Express, Django, Rails)
+- [ ] Copy-as-code snippets (curl, fetch, or framework-specific error responses) per status code
+- [ ] A "compare two codes" side-by-side view for easily confused pairs (401 vs 403, 409 vs 422, 301 vs 308)
+- [ ] Filterable by common frameworks' default usage (Express, Django REST, Spring)
+- [ ] Shareable deep links that pre-select a search term or category
+- [ ] Printable / exportable cheat-sheet (PDF or Markdown)
 
 ## License
 
